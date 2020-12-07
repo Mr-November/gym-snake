@@ -6,6 +6,15 @@ import numpy as np
 import pybullet as p
 from time import sleep
 
+def RungeKutta4(ode, step, x):
+    k1 = step * ode(x)
+    k2 = step * ode(x + k1 / 2)
+    k3 = step * ode(x + k2 / 2)
+    k4 = step * ode(x + k3)
+    y = x + 1.0 / 6.0 * (k1 + 2 * k2 + 2 * k3 + k4)
+
+    return y
+
 class SnakeEnv(gym.Env):
     metadata = {
         'render.modes': ['human', 'rgb_array'],
@@ -29,7 +38,7 @@ class SnakeEnv(gym.Env):
         # This is the result of CPG ode, which is automatically calculated.
         self.x = np.zeros((self.n, self.order + 1 + 1), dtype = np.float64)
         
-        # Action space: (n + n + n^2 + n) array.
+        # Action space: (n + n + n * n + n) array.
         # First n columns define the first column of Fourier coefficients(n-by-2).
         # Following n columns define the second column of Fourier coefficients.
         # Following n * n columns define the weight matrix(n-by-n).
@@ -124,7 +133,6 @@ class SnakeEnv(gym.Env):
     # 0,    1,    2,  ...  ,    order,    theta
     # This is a n-by-(order + 1 + 1) matrix
     def CPGode(self):
-
         y = np.zeros(self.x.shape, dtype = np.float64)
 
         for i in range(self.order + 1):
@@ -137,13 +145,3 @@ class SnakeEnv(gym.Env):
             y[i, self.order + 1] = delta + np.pi * self.nu
 
         return y
-
-def RungeKutta4(ode, step, x):
-
-    k1 = step * ode(x)
-    k2 = step * ode(x + k1 / 2)
-    k3 = step * ode(x + k2 / 2)
-    k4 = step * ode(x + k3)
-    y = x + 1.0 / 6.0 * (k1 + 2 * k2 + 2 * k3 + k4)
-
-    return y

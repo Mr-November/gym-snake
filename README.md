@@ -1,3 +1,1 @@
-nothing
-
-here
+Turn to see the comments in snake_env.py is a good idea.

@@ -30,11 +30,11 @@ class SnakeEnv(gym.Env):
 
         # Parameters that given by me.
         self.n = 15 # Number of oscillator.
-        self.stride = 0.01 # Time step of each loop.
+        self.stride = 0.01 # Time step of each loop. Unit: second.
         
         # These are learnable, but not now.
         self.order = 1 # Order of Fourier expension.
-        self.nu = 1 # Nu = 2 / T.
+        self.nu = 1 # Nu = 2 / T. Here T is the period of servo motion.
 
         # These are generated through action.
         self.coefficient_mat = np.zeros((self.n, self.order + 1), dtype = np.float64) # Fourier coefficients.
@@ -144,10 +144,10 @@ class SnakeEnv(gym.Env):
         return [seed]
 
     def step(self, action):
-        old_pos, _ = p.getBasePositionAndOrientation(self.id)
+        # old_pos, _ = p.getBasePositionAndOrientation(self.id)
 
         self.ProcessAction(action)
-        for i in range(1): # Each step consists of one self.stride
+        for i in range(1): # Each step consists of one self.stride of time.
         # for i in range(int(2 / (self.nu * self.stride))): # Each step consists of T.
             self.x = RungeKutta4(self.CPGode, self.stride, self.x)
             p.setJointMotorControlArray(self.id, range(self.n), p.POSITION_CONTROL, targetPositions = self.GetPos())
@@ -160,7 +160,9 @@ class SnakeEnv(gym.Env):
             self.state[i], _, _, _ = p.getJointState(self.id, i)
         # reward = self.GetReward(old_pos, new_pos)
         self._episode_steps += 1
-        # print(f"Max epsisode steps: {self._max_episode_steps}. Current episode steps: {self._episode_steps}")
+
+        # If the snake moves close to a point, then the process is good.
+        # The cost is the minus episode steps.
         distance = np.sqrt((new_pos[0]) ** 2 + (new_pos[1] - 1.0) ** 2)
         # print(distance)
         if self._episode_steps >= self._max_episode_steps:
@@ -168,6 +170,7 @@ class SnakeEnv(gym.Env):
             done = True
             self._episode_steps = 0
         elif distance <= 0.4:
+            # I want to give a large reward if the snake reaches the given point.
             reward = self._max_episode_steps - self._episode_steps
             done = True
             self._episode_steps = 0

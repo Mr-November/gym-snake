@@ -49,19 +49,37 @@ class SnakeEnv(gym.Env):
         self.state = np.zeros((self.n + 2), dtype = np.float64)
 
         # 2021.01.04 update.
-        # Action is the second Fourier coefficient and two phase differences.
+        # Plan A:
+        # Action is the second Fourier coefficient of each joint and two phase differences.
+        # action_low = np.hstack(
+        #     (np.array([0.0] * self.n),
+        #     np.array([0.0] * 2))
+        # )
+        # action_high = np.hstack(
+        #     (np.array([np.pi / 3.0] * self.n),
+        #     np.array([2.0 * np.pi] * 2))
+        # )
+        # self.action_space = spaces.Box(
+        #     low = action_low,
+        #     high = action_high,
+        #     shape = (self.n + 2, ),
+        #     dtype = np.float64
+        # )
+
+        # Plan B:
+        # Action is two coefficients and two phase differences.
         action_low = np.hstack(
-            (np.array([0.0] * self.n),
+            (np.array([0.0] * 2),
             np.array([0.0] * 2))
         )
         action_high = np.hstack(
-            (np.array([np.pi / 3.0] * self.n),
+            (np.array([np.pi / 3.0] * 2),
             np.array([2.0 * np.pi] * 2))
         )
         self.action_space = spaces.Box(
             low = action_low,
             high = action_high,
-            shape = (self.order * self.n + 2, ),
+            shape = (2 + 2, ),
             dtype = np.float64
         )
 
@@ -134,8 +152,12 @@ class SnakeEnv(gym.Env):
         return self.state, reward, done, {}
 
     def reset(self):
-        # action0 = np.zeros(((self.order + 1 + self.n + 1) * self.n), dtype = np.float64)
-        action0 = np.zeros(( 2 * self.n + 2), dtype = np.float64)
+        # Plan A:
+        # action0 = np.zeros((self.n + 2), dtype = np.float64)
+
+        # Plan B:
+        action0 = np.zeros((2 + 2), dtype = np.float64)
+
         self.ProcessAction(action0)
         self.x = np.zeros((self.n, self.order + 1 + 1), dtype = np.float64)
 
@@ -162,17 +184,36 @@ class SnakeEnv(gym.Env):
         return
 
     def ProcessAction(self, action):
+        # Plan A:
         # Get coefficients from action.
-        self.coefficient_mat[:, self.order] = action[0: self.n]
+        # self.coefficient_mat[:, self.order] = action[0: self.n]
+        # 
+        # Get phase differences from action.
+        # p = action[self.n: self.n + 2]
+        # for i in [2, 4, 6, 8, 10, 12, 14]:
+        #     self.phase_mat[i-2][i] = p[0]
+        #     self.phase_mat[i][i-2] = -p[0]
+        # for i in [3, 5, 7, 9, 11, 13]:
+        #     self.phase_mat[i-2][i] = p[1]
+        #     self.phase_mat[i][i-2] = -p[1]
+
+        # Plan B:
+        # Get coefficients from action.
+        c = action[0: 2]
+        for i in [0, 2, 4, 6, 8, 10, 12, 14]:
+            self.coefficient_mat[i][self.order] = c[0]
+        for i in [1, 3, 5, 7, 9, 11, 13]:
+            self.coefficient_mat[i][self.order] = c[1]
         
         # Get phase differences from action.
-        p = action[self.order * self.n: self.order * self.n + 2]
+        p = action[2: 2 + 2]
         for i in [2, 4, 6, 8, 10, 12, 14]:
             self.phase_mat[i-2][i] = p[0]
             self.phase_mat[i][i-2] = -p[0]
         for i in [3, 5, 7, 9, 11, 13]:
             self.phase_mat[i-2][i] = p[1]
             self.phase_mat[i][i-2] = -p[1]
+        
 
     # Calculate all the positions of oscillators.
     def GetPos(self):
@@ -207,10 +248,19 @@ class SnakeEnv(gym.Env):
 
 if __name__ == "__main__":
     env = gym.make("gym_snake:snake-v0")
+
+    # PLan A:
+    # action = np.hstack(
+    #     (np.array([np.pi / 3.0] * env.n), # Amplitude is all pi / 3.
+    #     np.array([np.pi / 4.0, np.pi / 2.0])) # Phase difference of 0, 2, 4, ... is pi/4, 1, 3, 5, ... is also pi/4.
+    # )
+
+    # Plan B:
     action = np.hstack(
-        (np.array([np.pi / 3.0] * env.n), # Amplitude is all pi / 3.
-        np.array([np.pi / 4.0, np.pi / 2.0])) # Phase difference of 0, 2, 4, ... is pi/4, 1, 3, 5, ... is also pi/4.
+            (np.array([np.pi / 3.0] * 2),
+            np.array([np.pi / 4.0, np.pi / 2.0]))
     )
+
     env.ProcessAction(action)
     y0 = [0.0]
     y1 = [0.0]

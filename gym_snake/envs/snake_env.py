@@ -24,7 +24,7 @@ class SnakeEnv(gym.Env):
 
     def __init__(self):
         # Each episode consists of self._max_episode_steps steps.
-        self._max_episode_steps = 2500
+        self._max_episode_steps = 50
         self._episode_steps = 0
         self.reset_steps = 500 # Reset the snake at the origin.
 
@@ -45,76 +45,33 @@ class SnakeEnv(gym.Env):
         # This is the result of CPG ode, which is automatically calculated.
         self.x = np.zeros((self.n, self.order + 1 + 1), dtype = np.float64)
 
-        # State is the position of each joint.
-        self.state = np.zeros((self.n), dtype = np.float64)
-        
-        # Action space: (n + n + n * n + n) array.
-        # First n columns define the first column of Fourier coefficients(n-by-2).
-        # Following n columns define the second column of Fourier coefficients.
-        # Following n * n columns define the weight matrix(n-by-n).
-        # Following n columns define the phase differences matrix(n-by-n).
-        # action_low = np.hstack(
-        #     (np.array([-np.pi / 4.0] * self.n * (self.order + 1)), # Something wrong here.
-        #     np.array([0.0] * self.n * self.n),
-        #     np.array([-np.pi] * self.n))
-        # )
-        # action_high = np.hstack(
-        #     (np.array([np.pi / 4.0] * self.n * (self.order + 1)),
-        #     np.array([1.0] * self.n * self.n),
-        #     np.array([np.pi] * self.n))
-        # )
+        # State is the position of each joint, as well as the x-y coordinate.
+        self.state = np.zeros((self.n + 2), dtype = np.float64)
 
-        # 2020.12.10 I change the action into:
-        # First n columns define the first column of Fourier coefficients(n-by-2).
-        # Following n columns define the second column of Fourier coefficients.
-        # Following 1 column define the phase differences matrix(n-by-n).
-        # When self.order == 1, the action looks like this:
-        # action_low = np.hstack(
-        #     (np.array([-np.pi / 4.0] * self.n),
-        #     np.array([0] * self.n),
-        #     np.array([0]))
-        # )
-        # action_high = np.hstack(
-        #     (np.array([np.pi / 4.0] * self.n),
-        #     np.array([np.pi / 4.0] * self.n),
-        #     np.array([2.0 * np.pi]))
-        # )
-        # self.action_space = spaces.Box(
-        #     low = action_low,
-        #     high = action_high,
-        #     shape = ((self.order + 1) * self.n + 1, ),
-        #     dtype = np.float64
-        # )
-
-        # 2020.12.20 I change the action again:
-        # First n columns define the first column of Fourier coefficients(n-by-2).
-        # Following n columns define the second column of Fourier coefficients.
-        # Following 2 column define the phase difference of 0, 2, 4, ..., 14 and 1, 3, 5, ..., 13.
-        # When self.order == 1, the action looks like this:
+        # 2021.01.04 update.
+        # Action is the second Fourier coefficient and two phase differences.
         action_low = np.hstack(
-            (np.array([-np.pi / 4.0] * self.n),
-            np.array([0.0] * self.n),
+            (np.array([0.0] * self.n),
             np.array([0.0] * 2))
         )
         action_high = np.hstack(
-            (np.array([np.pi / 4.0] * self.n),
-            np.array([np.pi / 4.0] * self.n),
+            (np.array([np.pi / 3.0] * self.n),
             np.array([2.0 * np.pi] * 2))
         )
         self.action_space = spaces.Box(
             low = action_low,
             high = action_high,
-            shape = ((self.order + 1) * self.n + 2, ),
+            shape = (self.order * self.n + 2, ),
             dtype = np.float64
         )
 
         # The observation is just the state.
-        state_low = np.array([-np.pi / 2.0, -np.pi] * 7 + [-np.pi / 2.0])
-        state_high = np.array([np.pi / 2.0, np.pi] * 7 + [np.pi / 2.0])
+        state_low = np.array([-np.pi / 3.0] * self.n + [-2.0] + [-2.0])
+        state_high = np.array([np.pi / 3.0] * self.n + [2.0] + [2.0])
         self.observation_space = spaces.Box(
             low = state_low,
             high = state_high,
-            shape = (self.n, ),
+            shape = (self.n + 2, ),
             dtype = np.float64
         )
 
@@ -144,38 +101,34 @@ class SnakeEnv(gym.Env):
         return [seed]
 
     def step(self, action):
-        # old_pos, _ = p.getBasePositionAndOrientation(self.id)
-
+        old_pos, _ = p.getBasePositionAndOrientation(self.id)
         self.ProcessAction(action)
-        for i in range(1): # Each step consists of one self.stride of time.
-        # for i in range(int(2 / (self.nu * self.stride))): # Each step consists of T.
+        # for i in range(1): # Each step consists of one self.stride of time.
+        for i in range(int(2 / (self.nu * self.stride))): # Each step consists of T.
             self.x = RungeKutta4(self.CPGode, self.stride, self.x)
             p.setJointMotorControlArray(self.id, range(self.n), p.POSITION_CONTROL, targetPositions = self.GetPos())
             p.stepSimulation()
             sleep(self.stride)
         new_pos, _ = p.getBasePositionAndOrientation(self.id)
-        # print(new_pos)
-
-        for i in range(self.n):
-            self.state[i], _, _, _ = p.getJointState(self.id, i)
-        # reward = self.GetReward(old_pos, new_pos)
         self._episode_steps += 1
 
-        # If the snake moves close to a point, then the process is good.
-        # The cost is the minus episode steps.
-        distance = np.sqrt((new_pos[0]) ** 2 + (new_pos[1] - 1.0) ** 2)
-        # print(distance)
-        if self._episode_steps >= self._max_episode_steps:
-            reward = -self._episode_steps
+        # Get state.
+        for i in range(self.n):
+            self.state[i], _, _, _ = p.getJointState(self.id, i)
+        self.state[self.n] = new_pos[0] # x coordinate.
+        self.state[self.n + 1] = new_pos[1] # y coordinate.
+
+        # Calculate the step reward.
+        reward = (new_pos[1] - old_pos[1]) - abs(new_pos[0] - old_pos[0])
+        if self._episode_steps >= self._max_episode_steps or self.state[self.n] > 1.0 or self.state[self.n] < -1.0 or self.state[self.n + 1] < -1.0:
+            reward -= 1.0
             done = True
             self._episode_steps = 0
-        elif distance <= 0.4:
-            # I want to give a large reward if the snake reaches the given point.
-            reward = self._max_episode_steps - self._episode_steps
+        elif self.state[self.n + 1] > 1.0:
+            reward += 1.0
             done = True
             self._episode_steps = 0
         else:
-            reward = 0
             done = False
 
         return self.state, reward, done, {}
@@ -208,23 +161,12 @@ class SnakeEnv(gym.Env):
         
         return
 
-    def GetReward(self, old_pos, new_pos):
-        reward = (new_pos[1] - old_pos[1]) - abs(new_pos[0] - old_pos[0])
-
-        return reward
-
     def ProcessAction(self, action):
         # Get coefficients from action.
-        for i in range(self.order + 1):
-            self.coefficient_mat[:, i] = action[i * self.n: (i + 1) * self.n]
+        self.coefficient_mat[:, self.order] = action[0: self.n]
         
-        # Get weights from action.
-        # self.weight_mat = action[(self.order + 1) * self.n: (self.order + 1 + self.n) * self.n].reshape(self.n, self.n)
-
         # Get phase differences from action.
-        # p = action[(self.order + 1 + self.n) * self.n: (self.order + 1 + self.n + 1) * self.n]
-        # p = np.zeros((self.n), dtype = np.float64)
-        p = action[(self.order + 1) * self.n: (self.order + 1) * self.n + 2]
+        p = action[self.order * self.n: self.order * self.n + 2]
         for i in [2, 4, 6, 8, 10, 12, 14]:
             self.phase_mat[i-2][i] = p[0]
             self.phase_mat[i][i-2] = -p[0]
@@ -266,9 +208,8 @@ class SnakeEnv(gym.Env):
 if __name__ == "__main__":
     env = gym.make("gym_snake:snake-v0")
     action = np.hstack(
-        (np.array([0] * env.n), # Deviation is 0.
-        np.array([np.pi / 3.0] * env.n), # Amplitude is all pi / 3.
-        np.array([np.pi / 4.0] * 2)) # Phase difference of 0, 2, 4, ... is pi/4, 1, 3, 5, ... is also pi/4.
+        (np.array([np.pi / 3.0] * env.n), # Amplitude is all pi / 3.
+        np.array([np.pi / 4.0, np.pi / 2.0])) # Phase difference of 0, 2, 4, ... is pi/4, 1, 3, 5, ... is also pi/4.
     )
     env.ProcessAction(action)
     y0 = [0.0]
@@ -292,33 +233,3 @@ if __name__ == "__main__":
     plt.figure()
     plt.plot(time, y1, "r-", time, y3, "g-", time, y5, "b-")
     plt.show()
-
-# if __name__ == "__main__":
-#     env = gym.make("gym_snake:snake-v0")
-#     plt.figure()
-#     pos_array = []
-#     pos_array2 = []
-#     time_array = []
-#     for i in range(10000):
-#         action = np.hstack(
-#             (np.array([0] * env.n),
-#             np.array([np.pi / 4.0, 0.0] * 7 + [np.pi / 4.0]),
-#             np.array([np.pi / 4.0]))
-#         )
-#         env.step(action)
-
-#         time = i * env.stride
-#         time_array.append(time)
-#         pos, _, _, _ = p.getJointState(env.id, 0)
-#         pos2, _, _, _ = p.getJointState(env.id, 2)
-
-#         pos_array.append(pos)
-#         pos_array2.append(pos2)
-#         plt.clf
-#         plt.plot(time_array, pos_array, "b-", time_array, pos_array2, "r-")
-#         plt.pause(0.001)
-
-#         if i > 100:
-#             time_array.pop(0)
-#             pos_array.pop(0)
-#             pos_array2.pop(0)

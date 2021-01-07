@@ -24,7 +24,7 @@ class SnakeEnv(gym.Env):
 
     def __init__(self):
         # Each episode consists of self._max_episode_steps steps.
-        self._max_episode_steps = 50
+        self._max_episode_steps = 30
         self._episode_steps = 0
         self.reset_steps = 500 # Reset the snake at the origin.
 
@@ -257,8 +257,8 @@ if __name__ == "__main__":
 
     # Plan B:
     action = np.hstack(
-            (np.array([np.pi / 3.0] * 2),
-            np.array([np.pi / 4.0, np.pi / 2.0]))
+            (np.array([np.pi / 3.0, 0.0]),
+            np.array([np.pi / 4.0] * 2))
     )
 
     env.ProcessAction(action)

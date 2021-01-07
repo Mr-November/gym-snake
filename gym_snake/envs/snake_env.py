@@ -73,7 +73,7 @@ class SnakeEnv(gym.Env):
             np.array([0.0] * 2))
         )
         action_high = np.hstack(
-            (np.array([np.pi / 3.0] * 2),
+            (np.array([np.pi / 4.0] * 2),
             np.array([2.0 * np.pi] * 2))
         )
         self.action_space = spaces.Box(
@@ -84,8 +84,8 @@ class SnakeEnv(gym.Env):
         )
 
         # The observation is just the state.
-        state_low = np.array([-np.pi / 3.0] * self.n + [-2.0] + [-2.0])
-        state_high = np.array([np.pi / 3.0] * self.n + [2.0] + [2.0])
+        state_low = np.array([-np.pi / 4.0] * self.n + [-2.0] + [-2.0])
+        state_high = np.array([np.pi / 4.0] * self.n + [2.0] + [2.0])
         self.observation_space = spaces.Box(
             low = state_low,
             high = state_high,
@@ -139,7 +139,7 @@ class SnakeEnv(gym.Env):
         # Calculate the step reward.
         reward = (new_pos[1] - old_pos[1]) - abs(new_pos[0] - old_pos[0])
         if self._episode_steps >= self._max_episode_steps or self.state[self.n] > 1.0 or self.state[self.n] < -1.0 or self.state[self.n + 1] < -1.0:
-            reward -= 1.0
+            reward -= 0.0
             done = True
             self._episode_steps = 0
         elif self.state[self.n + 1] > 1.0:

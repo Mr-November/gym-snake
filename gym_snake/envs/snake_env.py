@@ -98,10 +98,10 @@ class SnakeEnv(gym.Env):
         # Initialize pybullet environment.
         self.cid = p.connect(p.GUI)
         p.setGravity(0, 0, -9.8)
-        self.plane_id = p.loadURDF("/home/ellipse/anaconda3/lib/python3.8/site-packages/pybullet_data/plane.urdf")
+        self.plane_id = p.loadURDF("./plane.urdf")
         self.start_pos = [0, 0, 0.2]
         self.start_ori = p.getQuaternionFromEuler([0, np.pi / 2.0, 0])
-        self.id = p.loadURDF("/home/ellipse/Desktop/pysnake_ws/src/snake_description/urdf/snake_description.urdf", self.start_pos, self.start_ori)
+        self.id = p.loadURDF("./snake_description.urdf", self.start_pos, self.start_ori)
 
         # Set frictions
         lateral_friction = 0.8

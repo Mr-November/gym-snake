@@ -24,7 +24,7 @@ class SnakeEnv(gym.Env):
 
     def __init__(self):
         # Each episode consists of self._max_episode_steps steps.
-        self._max_episode_steps = 30
+        self._max_episode_steps = 20
         self._episode_steps = 0
         self.reset_steps = 500 # Reset the snake at the origin.
 
@@ -119,6 +119,7 @@ class SnakeEnv(gym.Env):
         return [seed]
 
     def step(self, action):
+        self._episode_steps += 1
         old_pos, _ = p.getBasePositionAndOrientation(self.id)
         self.ProcessAction(action)
         # for i in range(1): # Each step consists of one self.stride of time.
@@ -128,7 +129,6 @@ class SnakeEnv(gym.Env):
             p.stepSimulation()
             sleep(self.stride)
         new_pos, _ = p.getBasePositionAndOrientation(self.id)
-        self._episode_steps += 1
 
         # Get state.
         for i in range(self.n):
@@ -137,12 +137,12 @@ class SnakeEnv(gym.Env):
         self.state[self.n + 1] = new_pos[1] # y coordinate.
 
         # Calculate the step reward.
-        reward = (new_pos[1] - old_pos[1]) - abs(new_pos[0] - old_pos[0])
-        if self._episode_steps >= self._max_episode_steps or self.state[self.n] > 1.0 or self.state[self.n] < -1.0 or self.state[self.n + 1] < -1.0:
-            reward -= 0.0
+        reward = (new_pos[0] - old_pos[0]) - abs(new_pos[1] - old_pos[1])
+        if self._episode_steps >= self._max_episode_steps or self.state[self.n + 1] > 1.0 or self.state[self.n + 1] < -1.0 or self.state[self.n] < -1.0:
+            reward -= 1.0
             done = True
             self._episode_steps = 0
-        elif self.state[self.n + 1] > 1.0:
+        elif self.state[self.n] > 1.0:
             reward += 1.0
             done = True
             self._episode_steps = 0

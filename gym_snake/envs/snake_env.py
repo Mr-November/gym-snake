@@ -102,6 +102,7 @@ class SnakeEnv(gym.Env):
         self.start_pos = [0, 0, 0.2]
         self.start_ori = p.getQuaternionFromEuler([0, np.pi / 2.0, 0])
         self.id = p.loadURDF("./gym-snake/gym_snake/envs/snake_description/urdf/snake_description.urdf", self.start_pos, self.start_ori)
+        p.resetDebugVisualizerCamera( cameraDistance=1.5, cameraYaw=50, cameraPitch=-50, cameraTargetPosition=[1,-0.5,0])
 
         # Set frictions
         lateral_friction = 0.8
@@ -148,6 +149,8 @@ class SnakeEnv(gym.Env):
             self._episode_steps = 0
         else:
             done = False
+        
+        print(action)
 
         return self.state, reward, done, {}
 
